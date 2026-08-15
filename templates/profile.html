@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Profile · CIAS{% endblock %}
+{% block heading %}Your profile{% endblock %}
+{% block lede %}Account details and the access level assigned to you.{% endblock %}
+
+{% block content %}
+<div class="split">
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h2>{{ current_user.full_name }}</h2>
+        <p>Signed in as <span class="role-badge role-{{ current_user.role }}">{{ current_user.role_label }}</span></p>
+      </div>
+    </header>
+    <ul class="facts">
+      <li><span>Username</span><b>{{ current_user.username }}</b></li>
+      <li><span>Email</span><b>{{ current_user.email }}</b></li>
+      <li><span>Department</span><b>{{ current_user.department or "—" }}</b></li>
+      <li><span>Admin access</span><b>{{ "Yes" if current_user.is_admin else "No" }}</b></li>
+      <li><span>Can assign roles</span><b>{{ "Yes — Super Admin" if current_user.is_super_admin else "No" }}</b></li>
+    </ul>
+    {% if campus and campus.complete %}
+    <button type="button" class="btn" data-start-tour>Replay product tour</button>
+    {% endif %}
+  </article>
+  <article class="panel">
+    <header class="panel-head"><div><h2>Update details</h2></div></header>
+    <form method="post" class="stack">
+      <label>Full name <input name="full_name" value="{{ current_user.full_name }}" required></label>
+      <label>Email <input type="email" name="email" value="{{ current_user.email }}" required></label>
+      <label>Department <input name="department" value="{{ current_user.department or "" }}"></label>
+      <label>Current password <input type="password" name="current_password" autocomplete="current-password"></label>
+      <label>New password <input type="password" name="new_password" minlength="6" autocomplete="new-password"></label>
+      <button class="btn primary">Save profile</button>
+    </form>
+  </article>
+</div>
+{% endblock %}

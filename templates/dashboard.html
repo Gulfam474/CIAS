@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · CIAS{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block lede %}Overview of campus rooms, occupancy and who holds admin access.{% endblock %}
+
+{% block content %}
+<section class="stat-grid">
+  <article class="stat">
+    <span>Buildings</span>
+    <strong>{{ stats.buildings }}</strong>
+  </article>
+  <article class="stat">
+    <span>Classrooms</span>
+    <strong>{{ stats.classrooms }}</strong>
+  </article>
+  <article class="stat">
+    <span>Timetable entries</span>
+    <strong>{{ stats.timetable }}</strong>
+  </article>
+  <article class="stat">
+    <span>Confirmed bookings</span>
+    <strong>{{ stats.bookings }}</strong>
+  </article>
+  <article class="stat accent">
+    <span>Active admins</span>
+    <strong>{{ stats.admins }}</strong>
+  </article>
+  <article class="stat">
+    <span>Active users</span>
+    <strong>{{ stats.users }}</strong>
+  </article>
+</section>
+
+<div class="split">
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h2>Current occupancy</h2>
+        <p>{{ occupancy.day if occupancy else today }}{% if occupancy %} · {{ occupancy.slot }}{% endif %}</p>
+      </div>
+      <div class="toolbar" style="margin:0">
+        <a class="btn" href="{{ url_for('search_page') }}">Find empty classroom</a>
+        {% if campus and campus.complete %}
+        <button type="button" class="btn primary" data-start-tour>Product tour</button>
+        {% endif %}
+      </div>
+    </header>
+    {% if occupancy %}
+      <div class="meter">
+        <div class="meter-bar">
+          {% set pct = (occupancy.occupied / occupancy.total * 100) if occupancy.total else 0 %}
+          <i style="width: {{ pct }}%"></i>
+        </div>
+        <div class="meter-legend">
+          <span><b>{{ occupancy.occupied }}</b> occupied</span>
+          <span><b>{{ occupancy.available }}</b> free</span>
+          <span><b>{{ occupancy.total }}</b> rooms</span>
+        </div>
+      </div>
+    {% else %}
+      <p class="muted">Add time slots to see live occupancy.</p>
+    {% endif %}
+    <p class="hint">You are signed in as <b>{{ current_user.role_label }}</b>
+      {% if current_user.is_super_admin %}and can assign access to other users.
+      {% elif current_user.is_admin %}and can maintain campus data and the timetable.
+      {% else %}and can search rooms and create extra-class bookings.{% endif %}
+    </p>
+  </article>
+
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h2>Who is an admin?</h2>
+        <p>Accounts with Super Admin or Admin access.</p>
+      </div>
+    </header>
+    <ul class="people">
+      {% for person in admins %}
+        <li>
+          <div class="avatar sm">{{ person.full_name[:1] }}</div>
+          <div>
+            <strong>{{ person.full_name }}</strong>
+            <small>{{ person.department or 'Administration' }} · {{ person.username }}</small>
+          </div>
+          <span class="role-badge role-{{ person.role }}">{{ person.role_label }}</span>
+        </li>
+      {% else %}
+        <li class="muted">No admin accounts found.</li>
+      {% endfor %}
+    </ul>
+  </article>
+</div>
+
+<article class="panel">
+  <header class="panel-head">
+    <div>
+      <h2>Recent extra-class bookings</h2>
+      <p>Latest classroom reservations outside the regular timetable.</p>
+    </div>
+    <a class="btn ghost" href="{{ url_for('bookings_page') }}">View all</a>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Room</th>
+          <th>When</th>
+          <th>Purpose</th>
+          <th>Booked by</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in recent_bookings %}
+          <tr>
+            <td>
+              <b>{{ row.classroom.room_number if row.classroom else '—' }}</b>
+              <div class="sub">{{ row.classroom.location_label() if row.classroom else '' }}</div>
+            </td>
+            <td>{{ row.day_of_week }}<div class="sub">{{ row.timeslot.label() if row.timeslot else '' }}</div></td>
+            <td>{{ row.purpose }}</td>
+            <td>{{ row.booked_by.full_name if row.booked_by else '—' }}
+              <div class="sub">{{ row.booked_by.role_label if row.booked_by else '' }}</div>
+            </td>
+            <td><span class="pill {{ row.status }}">{{ row.status }}</span></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="muted">No bookings yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</article>
+{% endblock %}

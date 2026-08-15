@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Buildings · CIAS{% endblock %}
+{% block heading %}Buildings & floors{% endblock %}
+{% block lede %}Maintain the college map: blocks, floor names, and how rooms are grouped.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <button class="btn primary" id="add-building">Add building</button>
+  <button class="btn" id="add-floor">Add floor</button>
+</div>
+<div class="split">
+  <article class="panel">
+    <header class="panel-head"><div><h2>Buildings</h2></div></header>
+    <div id="building-table" class="table-wrap"></div>
+  </article>
+  <article class="panel">
+    <header class="panel-head"><div><h2>Floors</h2></div></header>
+    <div id="floor-table" class="table-wrap"></div>
+  </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  loadAll();
+  document.getElementById("add-building").onclick = () => openBuilding();
+  document.getElementById("add-floor").onclick = () => openFloor();
+});
+
+async function loadAll() {
+  const [buildings, floors] = await Promise.all([
+    CIAS.api("/api/buildings"),
+    CIAS.api("/api/floors"),
+  ]);
+  window._buildings = buildings.data || [];
+  renderBuildings(window._buildings);
+  renderFloors(floors.data || []);
+}
+
+function renderBuildings(rows) {
+  document.getElementById("building-table").innerHTML = CIAS.table(
+    ["Name", "Code", "Floors", "Rooms", "Status", ""],
+    rows.map((b) => [
+      `<b>${b.name}</b><div class="sub">${b.description || ""}</div>`,
+      b.code,
+      b.floor_count,
+      b.classroom_count,
+      `<span class="pill ${b.is_active ? "confirmed" : "cancelled"}">${b.is_active ? "Active" : "Inactive"}</span>`,
+      `<button class="link" onclick='openBuilding(${JSON.stringify(b)})'>Edit</button>
+       <button class="link danger" onclick="removeItem('/api/buildings/${b.id}')">Delete</button>`,
+    ])
+  );
+}
+
+function renderFloors(rows) {
+  document.getElementById("floor-table").innerHTML = CIAS.table(
+    ["Building", "Floor", "Name", "Description", "Rooms", ""],
+    rows.map((f) => [
+      f.building_name,
+      f.floor_number,
+      f.name,
+      f.description || "—",
+      f.classroom_count,
+      `<button class="link" onclick='openFloor(${JSON.stringify(f)})'>Edit</button>
+       <button class="link danger" onclick="removeItem('/api/floors/${f.id}')">Delete</button>`,
+    ])
+  );
+}
+
+function openBuilding(row = {}) {
+  CIAS.openModal(row.id ? "Edit building" : "Add building", `
+    <label>Name <input name="name" value="${row.name || ""}" required></label>
+    <label>Code <input name="code" value="${row.code || ""}" required></label>
+    <label>Description <input name="description" value="${row.description || ""}"></label>
+    <label class="check"><input type="checkbox" name="is_active" ${row.is_active !== false ? "checked" : ""}> Active</label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary">Save</button>
+    </div>`, async (data) => {
+    data.is_active = !!data.is_active;
+    const url = row.id ? `/api/buildings/${row.id}` : "/api/buildings";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    loadAll();
+  });
+}
+
+function openFloor(row = {}) {
+  const options = (window._buildings || []).map((b) =>
+    `<option value="${b.id}" ${b.id === row.building_id ? "selected" : ""}>${b.name}</option>`
+  ).join("");
+  CIAS.openModal(row.id ? "Edit floor" : "Add floor", `
+    <label>Building <select name="building_id" required ${row.id ? "disabled" : ""}>${options}</select></label>
+    <label>Floor number <input type="number" name="floor_number" value="${row.floor_number || 1}" required></label>
+    <label>Display name <input name="name" value="${row.name || ""}" placeholder="2nd Floor" required></label>
+    <label>Description <textarea name="description" rows="2" placeholder="Lecture rooms on this floor">${row.description || ""}</textarea></label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      ${row.id ? "" : `<button class="btn" data-add-more>Save & add another floor</button>`}
+      <button class="btn primary">Save</button>
+    </div>`, async (data) => {
+    if (row.id) data.building_id = row.building_id;
+    const addMore = !!data._add_more;
+    delete data._add_more;
+    const url = row.id ? `/api/floors/${row.id}` : "/api/floors";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    await loadAll();
+    if (addMore) {
+      openFloor({
+        building_id: Number(data.building_id),
+        floor_number: Number(data.floor_number) + 1,
+        name: "",
+        description: "",
+      });
+    }
+  });
+}
+
+async function removeItem(url) {
+  if (!confirm("Delete this record? Linked classrooms will also be removed.")) return;
+  const res = await CIAS.api(url, { method: "DELETE" });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadAll();
+}
+</script>
+{% endblock %}

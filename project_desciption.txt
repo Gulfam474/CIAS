@@ -1,0 +1,83 @@
+Project Description
+
+Classroom Information and Availability System (CIAS)
+
+Classroom Information and Availability System (CIAS) is an admin-based desktop application developed to help college administrators efficiently view classroom information and find suitable empty classrooms when a classroom is required for an extra class, replacement lecture, meeting, or other academic activity.
+
+The system stores organized information about the college's buildings, floors, classrooms, classroom capacity, time slots, and timetable allocations. The administrator can select the required day, time slot, building/floor, and number of students, and the system checks the existing classroom allocation to identify classrooms that are free during that particular period.
+
+The system displays suitable available classrooms along with their building, floor, room number, and student capacity, helping the administrator quickly select an appropriate classroom without manually checking the timetable.
+
+Main Objectives
+
+To maintain organized information about college buildings, floors, and classrooms.
+
+To store the student capacity of each classroom.
+
+To maintain classroom timetable and allocation information.
+
+To identify classrooms that are occupied or available for a particular time slot.
+
+To find a suitable empty classroom according to the required number of students.
+
+To reduce the manual effort involved in checking classroom availability.
+
+To provide a simple and user-friendly admin application.
+
+
+Main Workflow
+
+Admin Login
+     ↓
+Dashboard
+     ↓
+Find Empty Classroom
+     ↓
+Select Day
+     ↓
+Select Time Slot
+     ↓
+Select Building / Floor
+     ↓
+Enter Required Student Capacity
+     ↓
+Check Timetable
+     ↓
+Find Unoccupied Classrooms
+     ↓
+Display Suitable Classrooms
+
+Example
+
+If a teacher needs a classroom for an extra class:
+
+Day: Wednesday
+Time: 2:00 PM – 3:00 PM
+Students: 45
+
+The system might show:
+
+Available Classrooms
+
+Room 204
+Main Building • 2nd Floor
+Capacity: 60
+
+Room 305
+Science Building • 3rd Floor
+Capacity: 50
+
+Rooms that are already being used during that time will not be shown as available.
+
+Technology
+
+Frontend: HTML, CSS, JavaScript
+
+Backend: Python
+
+Database: MySQL
+
+
+Short description for your project paper
+
+> CIAS is an admin-based desktop application that helps college administrators find suitable empty classrooms for extra or replacement classes. The system uses classroom, building, floor, capacity, time-slot, and timetable information to identify classrooms that are available at a particular day and time.

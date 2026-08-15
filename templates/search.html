@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Find Classroom · CIAS{% endblock %}
+{% block heading %}Find empty classroom{% endblock %}
+{% block lede %}Select day, time, location and student count. Occupied rooms are hidden from the suitable list.{% endblock %}
+
+{% block content %}
+{% if campus and not campus.complete and not current_user.is_admin %}
+<article class="panel">
+  <h2>Campus is not set up yet</h2>
+  <p class="muted">An administrator still needs to add buildings, floors and time slots before classrooms can be searched.</p>
+</article>
+{% else %}
+<article class="panel">
+  <form id="search-form" class="filters">
+    <label>Day
+      <select name="day" required>
+        {% for day in DAYS %}
+          <option value="{{ day }}" {% if day == 'Wednesday' %}selected{% endif %}>{{ day }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Time slot
+      <select name="timeslot_id" required>
+        <option value="">Select period</option>
+        {% set ns = namespace(picked=false) %}
+        {% for slot in timeslots %}
+          <option value="{{ slot.id }}" {% if not slot.is_break and not ns.picked %}selected{% set ns.picked = true %}{% endif %} {% if slot.is_break %}disabled{% endif %}>
+            {{ slot.label() }}{% if slot.is_break %} — break{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Building
+      <select name="building_id" id="search-building">
+        <option value="">Any building</option>
+        {% for b in buildings %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Floor
+      <select name="floor_id" id="search-floor">
+        <option value="">Any floor</option>
+      </select>
+    </label>
+    <label>Students
+      <input type="number" name="capacity" min="1" value="45" required>
+    </label>
+    <button type="submit" class="btn primary">Check availability</button>
+  </form>
+</article>
+
+<div id="search-summary" class="search-summary" hidden></div>
+
+<section class="split">
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h2>Suitable available classrooms</h2>
+        <p>Free in that period and large enough for the class.</p>
+      </div>
+    </header>
+    <div id="available-results" class="room-grid">
+      <p class="muted">Run a search to see free rooms.</p>
+    </div>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h2>Already in use</h2>
+        <p>These rooms will not be offered as available.</p>
+      </div>
+    </header>
+    <div id="occupied-results" class="stack-list">
+      <p class="muted">Occupied rooms appear here after a search.</p>
+    </div>
+  </article>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const building = document.getElementById("search-building");
+  const floor = document.getElementById("search-floor");
+  const form = document.getElementById("search-form");
+  if (!form || !building || !floor) return;
+  building.addEventListener("change", () => CIAS.loadFloors(building.value, floor));
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const payload = {
+      day: form.day.value,
+      timeslot_id: form.timeslot_id.value,
+      building_id: form.building_id.value,
+      floor_id: form.floor_id.value,
+      capacity: Number(form.capacity.value),
+    };
+    const res = await CIAS.api("/api/search", { method: "POST", body: payload });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    renderSearch(res.data);
+  });
+});
+
+function renderSearch(data) {
+  const summary = document.getElementById("search-summary");
+  summary.hidden = false;
+  summary.innerHTML = `
+    <div><b>${data.filters.day}</b> · ${data.filters.timeslot}</div>
+    <div>${data.counts.available} suitable · ${data.counts.occupied} occupied · ${data.counts.checked} rooms checked</div>
+    <div>Need ${data.filters.capacity} seats</div>`;
+
+  const available = document.getElementById("available-results");
+  if (!data.available.length) {
+    available.innerHTML = `<p class="muted">No free classroom matches this capacity and location.</p>`;
+  } else {
+    available.innerHTML = data.available.map((room) => `
+      <article class="room-card">
+        <div class="room-no">Room ${room.room_number}</div>
+        <div class="room-loc">${room.location}</div>
+        <div class="room-meta">
+          <span>Capacity: ${room.capacity}</span>
+          <span>${room.room_type}</span>
+        </div>
+        <div class="spare">${room.spare_seats} spare seats</div>
+        ${room.facilities ? `<small>${room.facilities}</small>` : ""}
+        <button class="btn small" onclick='CIAS.quickBook(${JSON.stringify(room)}, ${JSON.stringify(data.filters)})'>Book this room</button>
+      </article>`).join("");
+  }
+
+  const occupied = document.getElementById("occupied-results");
+  if (!data.occupied.length) {
+    occupied.innerHTML = `<p class="muted">No occupied rooms in this filter.</p>`;
+  } else {
+    occupied.innerHTML = data.occupied.map((room) => `
+      <div class="list-row">
+        <div>
+          <b>Room ${room.room_number}</b>
+          <div class="sub">${room.location} · ${room.capacity} seats</div>
+        </div>
+        <span class="pill occupied">${room.reason}</span>
+      </div>`).join("");
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Bookings · CIAS{% endblock %}
+{% block heading %}Extra-class bookings{% endblock %}
+{% block lede %}Reserve a free classroom for replacement lectures, meetings, or other academic work.{% endblock %}
+
+{% block content %}
+<div class="toolbar filters">
+  <label>Day
+    <select id="filter-day">
+      <option value="">All days</option>
+      {% for day in DAYS %}<option value="{{ day }}">{{ day }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Status
+    <select id="filter-status">
+      <option value="">All</option>
+      <option value="confirmed">Confirmed</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+  </label>
+  <button class="btn primary" id="add-booking">New booking</button>
+</div>
+<article class="panel">
+  <div id="booking-table" class="table-wrap"></div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DAYS = {{ DAYS | tojson }};
+const IS_ADMIN = {{ 'true' if current_user.is_admin else 'false' }};
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("filter-day").onchange = loadBookings;
+  document.getElementById("filter-status").onchange = loadBookings;
+  document.getElementById("add-booking").onclick = () => openBooking();
+  loadBookings();
+});
+
+async function loadBookings() {
+  const qs = new URLSearchParams({
+    day: document.getElementById("filter-day").value,
+    status: document.getElementById("filter-status").value,
+  });
+  const res = await CIAS.api("/api/bookings?" + qs.toString());
+  const rows = res.data || [];
+  document.getElementById("booking-table").innerHTML = CIAS.table(
+    ["Room", "When", "Purpose", "Students", "Booked by", "Status", ""],
+    rows.map((r) => [
+      `<b>${r.room_number}</b><div class="sub">${r.location}</div>`,
+      `${r.day_of_week}<div class="sub">${r.timeslot_label}</div>`,
+      `${r.purpose}${r.notes ? `<div class="sub">${r.notes}</div>` : ""}`,
+      r.student_count || "—",
+      `${r.booked_by}<div class="sub">${r.booked_by_role}</div>`,
+      `<span class="pill ${r.status}">${r.status}</span>`,
+      `${r.status === "confirmed" ? `<button class="link" onclick="cancelBooking(${r.id})">Cancel</button>` : ""}
+       <button class="link" onclick='openBooking(${JSON.stringify(r)})'>Edit</button>
+       <button class="link danger" onclick="removeBooking(${r.id})">Delete</button>`,
+    ])
+  );
+}
+
+async function openBooking(row = {}) {
+  const lookups = await CIAS.api("/api/lookups");
+  const rooms = lookups.data.classrooms;
+  const slots = lookups.data.timeslots.filter((s) => !s.is_break);
+  CIAS.openModal(row.id ? "Edit booking" : "Book classroom", `
+    <label>Day
+      <select name="day_of_week" required>${DAYS.map((d) => `<option ${d === (row.day_of_week || "Wednesday") ? "selected" : ""}>${d}</option>`).join("")}</select>
+    </label>
+    <label>Time slot
+      <select name="timeslot_id" required>${slots.map((s) => `<option value="${s.id}" ${s.id == row.timeslot_id ? "selected" : ""}>${s.label}</option>`).join("")}</select>
+    </label>
+    <label>Classroom
+      <select name="classroom_id" required>${rooms.map((c) => `<option value="${c.id}" ${c.id == row.classroom_id ? "selected" : ""}>${c.room_number} — ${c.location} (${c.capacity})</option>`).join("")}</select>
+    </label>
+    <label>Purpose <input name="purpose" value="${row.purpose || ""}" placeholder="Extra class / meeting" required></label>
+    <label>Student count <input type="number" name="student_count" min="0" value="${row.student_count || 0}"></label>
+    <label>Notes <input name="notes" value="${row.notes || ""}"></label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary">Save</button>
+    </div>`, async (data) => {
+    data.student_count = Number(data.student_count || 0);
+    const url = row.id ? `/api/bookings/${row.id}` : "/api/bookings";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    loadBookings();
+  });
+}
+
+async function cancelBooking(id) {
+  const res = await CIAS.api(`/api/bookings/${id}`, { method: "PUT", body: { status: "cancelled" } });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadBookings();
+}
+
+async function removeBooking(id) {
+  if (!confirm("Delete this booking?")) return;
+  const res = await CIAS.api(`/api/bookings/${id}`, { method: "DELETE" });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadBookings();
+}
+</script>
+{% endblock %}

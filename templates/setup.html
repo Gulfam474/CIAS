@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Campus setup · CIAS{% endblock %}
+{% block heading %}Set up your campus{% endblock %}
+{% block lede %}Add a building, its floor, a classroom, and teaching periods before you search for empty rooms.{% endblock %}
+
+{% block content %}
+<nav class="stepper" aria-label="Setup steps">
+  <button type="button" class="step" data-goto="1">
+    <span class="step-num">1</span>
+    Building
+  </button>
+  <button type="button" class="step" data-goto="2">
+    <span class="step-num">2</span>
+    Floor
+  </button>
+  <button type="button" class="step" data-goto="3">
+    <span class="step-num">3</span>
+    Classroom
+  </button>
+  <button type="button" class="step" data-goto="4">
+    <span class="step-num">4</span>
+    Time slot
+  </button>
+</nav>
+
+<section class="setup-card panel">
+  <div id="step-panel"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ROOM_TYPES = {{ ROOM_TYPES | tojson }};
+let state = { step: {{ campus.step if campus.step < 5 else 1 }}, data: null };
+
+document.addEventListener("DOMContentLoaded", async () => {
+  document.querySelectorAll(".step").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = Number(btn.dataset.goto);
+      if (target <= maxAllowedStep()) goTo(target);
+    });
+  });
+  await refresh();
+  goTo(state.step);
+});
+
+function maxAllowedStep() {
+  const c = state.data && state.data.counts ? state.data.counts : {};
+  if (!c.buildings) return 1;
+  if (!c.floors) return 2;
+  if (!c.classrooms) return 3;
+  return 4;
+}
+
+async function refresh() {
+  const res = await CIAS.api("/api/setup/status");
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  state.data = res.data;
+  if (res.data.complete) {
+    window.location.href = "{{ url_for('search_page') }}";
+    return;
+  }
+  state.step = Math.min(state.step, res.data.step);
+}
+
+function paintStepper() {
+  const allowed = maxAllowedStep();
+  document.querySelectorAll(".step").forEach((btn) => {
+    const n = Number(btn.dataset.goto);
+    btn.classList.toggle("is-active", n === state.step);
+    btn.classList.toggle("is-done", n < state.step || (n < allowed && n !== state.step && countsFor(n)));
+  });
+}
+
+function countsFor(n) {
+  const c = state.data.counts;
+  return [c.buildings, c.floors, c.classrooms, c.timeslots][n - 1] > 0;
+}
+
+function goTo(step) {
+  state.step = step;
+  paintStepper();
+  const panel = document.getElementById("step-panel");
+  panel.innerHTML = [null, buildingForm, floorForm, classroomForm, slotForm][step]();
+  bindForm();
+}
+
+function createdList(title, items) {
+  if (!items.length) return "";
+  return `<div class="created-box"><p>${title}</p><ul>${items}</ul></div>`;
+}
+
+function buildingForm() {
+  const rows = (state.data.buildings || []).map((b) => `<li><b>${b.name}</b> · ${b.code}</li>`).join("");
+  return `
+    <p class="eyebrow">Step 1 of 4</p>
+    <h2>Add a college building</h2>
+    <p class="muted">This is the campus block that contains classrooms, for example Main Building.</p>
+    <form id="setup-form" class="stack setup-form">
+      <label>Building name <input name="name" placeholder="Main Building" required></label>
+      <label>Short code <input name="code" placeholder="MAIN" required></label>
+      <label>Description <input name="description" placeholder="Central academic block"></label>
+      ${stepActions(1, "Save building")}
+    </form>
+    ${createdList("Buildings added", rows)}`;
+}
+
+function floorForm() {
+  const buildings = state.data.buildings || [];
+  const options = buildings.map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
+  const rows = (state.data.floors || []).map((f) => `<li><b>${f.name}</b> · ${f.building_name}</li>`).join("");
+  return `
+    <p class="eyebrow">Step 2 of 4</p>
+    <h2>Add a floor in that building</h2>
+    <p class="muted">Floors group rooms, for example 2nd Floor in Main Building.</p>
+    <form id="setup-form" class="stack setup-form">
+      <label>Building
+        <select name="building_id" required>${options}</select>
+      </label>
+      <label>Floor number <input type="number" name="floor_number" value="1" min="0" required></label>
+      <label>Display name <input name="name" placeholder="1st Floor" required></label>
+      ${stepActions(2, "Save floor")}
+    </form>
+    ${createdList("Floors added", rows)}`;
+}
+
+function classroomForm() {
+  const floors = state.data.floors || [];
+  const options = floors.map((f) => `<option value="${f.id}">${f.building_name} · ${f.name}</option>`).join("");
+  const types = ROOM_TYPES.map((t) => `<option>${t}</option>`).join("");
+  const rows = (state.data.classrooms || []).map((c) => `<li><b>Room ${c.room_number}</b> · ${c.location} · ${c.capacity} seats</li>`).join("");
+  return `
+    <p class="eyebrow">Step 3 of 4</p>
+    <h2>Add a classroom</h2>
+    <p class="muted">Room number and student capacity are used when finding a suitable empty classroom.</p>
+    <form id="setup-form" class="stack setup-form">
+      <label>Floor
+        <select name="floor_id" required>${options}</select>
+      </label>
+      <label>Room number <input name="room_number" placeholder="204" required></label>
+      <label>Student capacity <input type="number" name="capacity" min="1" value="60" required></label>
+      <label>Type <select name="room_type">${types}</select></label>
+      <label>Facilities <input name="facilities" placeholder="Projector, AC"></label>
+      ${stepActions(3, "Save classroom")}
+    </form>
+    ${createdList("Classrooms added", rows)}`;
+}
+
+function slotForm() {
+  const rows = (state.data.timeslots || []).map((s) => `<li><b>${s.name}</b> · ${s.start_time} – ${s.end_time}${s.is_break ? " (break)" : ""}</li>`).join("");
+  return `
+    <p class="eyebrow">Step 4 of 4</p>
+    <h2>Add a time slot</h2>
+    <p class="muted">Teaching periods such as 2:00 PM – 3:00 PM. Breaks cannot be booked.</p>
+    <form id="setup-form" class="stack setup-form">
+      <label>Period name <input name="name" placeholder="Period 5" required></label>
+      <label>Start <input type="time" name="start_time" value="14:00" required></label>
+      <label>End <input type="time" name="end_time" value="15:00" required></label>
+      <label>Sort order <input type="number" name="sort_order" value="${(state.data.timeslots || []).length + 1}"></label>
+      <label class="check"><input type="checkbox" name="is_break"> This is a break</label>
+      ${stepActions(4, "Save time slot")}
+    </form>
+    ${createdList("Time slots added", rows)}`;
+}
+
+function stepActions(step, saveLabel) {
+  const hasRows = countsFor(step);
+  const finish = step === 4 && state.data.counts.timeslots > 0 && state.data.counts.classrooms > 0;
+  return `<div class="setup-actions">
+      ${step > 1 ? `<button class="btn" type="button" data-back>Back</button>` : ""}
+      <button class="btn primary" type="submit">${saveLabel}</button>
+      ${hasRows && step < 4 ? `<button class="btn" type="button" data-next>Continue</button>` : ""}
+      ${finish ? `<button class="btn" type="button" data-finish>Go to search</button>` : ""}
+    </div>`;
+}
+
+function bindForm() {
+  const form = document.getElementById("setup-form");
+  const back = form.querySelector("[data-back]");
+  if (back) back.onclick = () => goTo(state.step - 1);
+  const next = form.querySelector("[data-next]");
+  if (next) next.onclick = () => goTo(state.step + 1);
+  const finish = form.querySelector("[data-finish]");
+  if (finish) finish.onclick = () => { window.location.href = "{{ url_for('search_page') }}"; };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = CIAS.formData(form);
+    const map = {
+      1: { url: "/api/buildings", next: 2 },
+      2: { url: "/api/floors", next: 3 },
+      3: { url: "/api/classrooms", next: 4 },
+      4: { url: "/api/timeslots", next: 4 },
+    };
+    const cfg = map[state.step];
+    if (state.step === 2) payload.floor_number = Number(payload.floor_number);
+    if (state.step === 3) payload.capacity = Number(payload.capacity);
+    if (state.step === 4) {
+      payload.sort_order = Number(payload.sort_order || 0);
+      payload.is_break = !!payload.is_break;
+    }
+    const res = await CIAS.api(cfg.url, { method: "POST", body: payload });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.toast("Saved.", "success");
+    await refresh();
+    if (state.data && state.data.complete) return;
+    goTo(state.data.step);
+  };
+}
+</script>
+{% endblock %}

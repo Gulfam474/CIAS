@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Occupancy · CIAS{% endblock %}
+{% block heading %}Classroom occupancy{% endblock %}
+{% block lede %}See which rooms are free or taken for a chosen day and period.{% endblock %}
+
+{% block content %}
+<article class="panel">
+  <form id="occ-form" class="filters">
+    <label>Day
+      <select name="day">
+        {% for day in DAYS %}<option value="{{ day }}">{{ day }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Time slot
+      <select name="timeslot_id">
+        {% for slot in timeslots %}
+          <option value="{{ slot.id }}" {% if slot.is_break %}disabled{% endif %}>{{ slot.label() }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Building
+      <select name="building_id" id="occ-building">
+        <option value="">All buildings</option>
+        {% for b in buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Floor
+      <select name="floor_id" id="occ-floor"><option value="">All floors</option></select>
+    </label>
+    <button class="btn primary">Show occupancy</button>
+  </form>
+</article>
+<div id="occ-summary" class="search-summary" hidden></div>
+<article class="panel">
+  <div id="occ-grid" class="room-grid"><p class="muted">Choose a day and period to view occupancy.</p></div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const building = document.getElementById("occ-building");
+  const floor = document.getElementById("occ-floor");
+  building.addEventListener("change", () => CIAS.loadFloors(building.value, floor));
+  document.getElementById("occ-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const qs = new URLSearchParams({
+      day: form.day.value,
+      timeslot_id: form.timeslot_id.value,
+      building_id: form.building_id.value,
+      floor_id: form.floor_id.value,
+    });
+    const res = await CIAS.api("/api/occupancy?" + qs.toString());
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    const data = res.data;
+    const summary = document.getElementById("occ-summary");
+    summary.hidden = false;
+    summary.innerHTML = `<div><b>${data.day}</b> · ${data.timeslot.label}</div>
+      <div>${data.counts.available} available · ${data.counts.occupied} occupied</div>`;
+    document.getElementById("occ-grid").innerHTML = data.rooms.map((room) => `
+      <article class="room-card ${room.status}">
+        <div class="room-no">Room ${room.room_number}</div>
+        <div class="room-loc">${room.location}</div>
+        <div class="room-meta"><span>Capacity: ${room.capacity}</span><span>${room.room_type}</span></div>
+        <span class="pill ${room.status}">${room.status}</span>
+        ${room.reason ? `<small>${room.reason}</small>` : ""}
+      </article>`).join("") || `<p class="muted">No classrooms in this filter.</p>`;
+  });
+});
+</script>
+{% endblock %}

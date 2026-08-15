@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Timetable · CIAS{% endblock %}
+{% block heading %}Timetable allocations{% endblock %}
+{% block lede %}Regular class allocations. A room with an entry here is occupied for that day and period.{% endblock %}
+
+{% block content %}
+<div class="toolbar filters">
+  <label>Day
+    <select id="filter-day">
+      <option value="">All days</option>
+      {% for day in DAYS %}<option value="{{ day }}">{{ day }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Time slot
+    <select id="filter-slot">
+      <option value="">All slots</option>
+      {% for slot in timeslots %}<option value="{{ slot.id }}">{{ slot.label() }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="btn primary" id="add-entry">Allocate classroom</button>
+</div>
+<article class="panel">
+  <div id="tt-table" class="table-wrap"></div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DAYS = {{ DAYS | tojson }};
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("filter-day").onchange = loadTT;
+  document.getElementById("filter-slot").onchange = loadTT;
+  document.getElementById("add-entry").onclick = () => openTT();
+  loadTT();
+});
+
+async function loadTT() {
+  const qs = new URLSearchParams({
+    day: document.getElementById("filter-day").value,
+    timeslot_id: document.getElementById("filter-slot").value,
+  });
+  const res = await CIAS.api("/api/timetable?" + qs.toString());
+  const rows = res.data || [];
+  document.getElementById("tt-table").innerHTML = CIAS.table(
+    ["Day", "Slot", "Room", "Subject", "Teacher", "Class", ""],
+    rows.map((r) => [
+      r.day_of_week,
+      r.timeslot_label,
+      `<b>${r.room_number}</b><div class="sub">${r.location}</div>`,
+      r.subject,
+      r.teacher_name || "—",
+      r.class_group || "—",
+      `<button class="link" onclick='openTT(${JSON.stringify(r)})'>Edit</button>
+       <button class="link danger" onclick="removeTT(${r.id})">Delete</button>`,
+    ])
+  );
+}
+
+async function openTT(row = {}) {
+  const lookups = await CIAS.api("/api/lookups");
+  const rooms = lookups.data.classrooms;
+  const slots = lookups.data.timeslots.filter((s) => !s.is_break);
+  CIAS.openModal(row.id ? "Edit allocation" : "Allocate classroom", `
+    <label>Day
+      <select name="day_of_week" required>${DAYS.map((d) => `<option ${d === (row.day_of_week || "Monday") ? "selected" : ""}>${d}</option>`).join("")}</select>
+    </label>
+    <label>Time slot
+      <select name="timeslot_id" required>${slots.map((s) => `<option value="${s.id}" ${s.id == row.timeslot_id ? "selected" : ""}>${s.label}</option>`).join("")}</select>
+    </label>
+    <label>Classroom
+      <select name="classroom_id" required>${rooms.map((c) => `<option value="${c.id}" ${c.id == row.classroom_id ? "selected" : ""}>${c.room_number} — ${c.location} (${c.capacity})</option>`).join("")}</select>
+    </label>
+    <label>Subject <input name="subject" value="${row.subject || ""}" required></label>
+    <label>Teacher <input name="teacher_name" value="${row.teacher_name || ""}"></label>
+    <label>Class / batch <input name="class_group" value="${row.class_group || ""}"></label>
+    <label>Academic year <input name="academic_year" value="${row.academic_year || "2025-26"}"></label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary">Save</button>
+    </div>`, async (data) => {
+    const url = row.id ? `/api/timetable/${row.id}` : "/api/timetable";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    loadTT();
+  });
+}
+
+async function removeTT(id) {
+  if (!confirm("Remove this timetable allocation?")) return;
+  const res = await CIAS.api(`/api/timetable/${id}`, { method: "DELETE" });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadTT();
+}
+</script>
+{% endblock %}

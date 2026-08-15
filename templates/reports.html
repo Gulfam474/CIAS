@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Reports · CIAS{% endblock %}
+{% block heading %}Reports{% endblock %}
+{% block lede %}Utilization of classrooms across the week and capacity by building.{% endblock %}
+
+{% block content %}
+<div class="split">
+  <article class="panel">
+    <header class="panel-head"><div><h2>Weekly utilization</h2><p>Occupied room-slots versus total teaching slots.</p></div></header>
+    <div id="day-table" class="table-wrap"></div>
+  </article>
+  <article class="panel">
+    <header class="panel-head"><div><h2>Capacity by building</h2></div></header>
+    <div id="bldg-table" class="table-wrap"></div>
+  </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const res = await CIAS.api("/api/reports/summary");
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  document.getElementById("day-table").innerHTML = CIAS.table(
+    ["Day", "Occupied slots", "Total slots", "Utilization"],
+    res.data.by_day.map((d) => [
+      d.day,
+      d.occupied_slots,
+      d.total_slots,
+      `<div class="mini-bar"><i style="width:${d.utilization}%"></i></div> ${d.utilization}%`,
+    ])
+  );
+  document.getElementById("bldg-table").innerHTML = CIAS.table(
+    ["Building", "Classrooms", "Total seats"],
+    res.data.by_building.map((b) => [b.building, b.classrooms, b.total_capacity])
+  );
+});
+</script>
+{% endblock %}

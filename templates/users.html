@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Users & Access · CIAS{% endblock %}
+{% block heading %}Users & access{% endblock %}
+{% block lede %}Identify admins, assign roles, and control who can maintain campus data.{% endblock %}
+
+{% block content %}
+<section class="role-guide">
+  <article>
+    <span class="role-badge role-super_admin">Super Admin</span>
+    <p>Full control. Can create users and assign Admin or Staff access.</p>
+  </article>
+  <article>
+    <span class="role-badge role-admin">Admin</span>
+    <p>Manages buildings, classrooms, timetable, bookings and reports.</p>
+  </article>
+  <article>
+    <span class="role-badge role-staff">Staff</span>
+    <p>Can find empty classrooms and book a free room for extra work.</p>
+  </article>
+</section>
+
+<div class="toolbar filters">
+  <label>Show
+    <select id="filter-role">
+      <option value="">All users</option>
+      <option value="admins">Admins only</option>
+      <option value="super_admin">Super Admin</option>
+      <option value="admin">Admin</option>
+      <option value="staff">Staff</option>
+    </select>
+  </label>
+  <button class="btn primary" id="add-user">Create user & assign access</button>
+</div>
+<article class="panel">
+  <div id="user-table" class="table-wrap"></div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ROLES = {{ ROLE_LABELS | tojson }};
+const ME = {{ current_user.id }};
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("filter-role").onchange = loadUsers;
+  document.getElementById("add-user").onclick = () => openUser();
+  loadUsers();
+});
+
+async function loadUsers() {
+  const filter = document.getElementById("filter-role").value;
+  let url = "/api/users";
+  if (filter === "admins") url += "?admins=1";
+  else if (filter) url += "?role=" + filter;
+  const res = await CIAS.api(url);
+  const rows = res.data || [];
+  document.getElementById("user-table").innerHTML = CIAS.table(
+    ["User", "Username", "Department", "Role", "Last login", "Status", ""],
+    rows.map((u) => [
+      `<b>${u.full_name}</b><div class="sub">${u.email}</div>`,
+      u.username,
+      u.department || "—",
+      `<span class="role-badge role-${u.role}">${u.role_label}</span>${u.is_admin ? ' <span class="admin-tag">Admin access</span>' : ""}`,
+      u.last_login,
+      `<span class="pill ${u.is_active ? "confirmed" : "cancelled"}">${u.is_active ? "Active" : "Deactivated"}</span>`,
+      `<button class="link" onclick='openUser(${JSON.stringify(u)})'>Edit access</button>
+       ${u.id !== ME ? `<button class="link danger" onclick="removeUser(${u.id})">Delete</button>` : "<span class='sub'>You</span>"}`,
+    ])
+  );
+}
+
+function openUser(row = {}) {
+  const roleOptions = Object.entries(ROLES).map(([id, label]) =>
+    `<option value="${id}" ${id === (row.role || "staff") ? "selected" : ""}>${label}</option>`
+  ).join("");
+  CIAS.openModal(row.id ? "Edit user access" : "Create user", `
+    ${row.id ? `<p class="hint">Username <b>${row.username}</b> cannot be changed.</p>` : `<label>Username <input name="username" required></label>`}
+    <label>Full name <input name="full_name" value="${row.full_name || ""}" required></label>
+    <label>Email <input type="email" name="email" value="${row.email || ""}" required></label>
+    <label>Department <input name="department" value="${row.department || ""}"></label>
+    <label>Assign role
+      <select name="role" required>${roleOptions}</select>
+    </label>
+    <label>${row.id ? "Reset password (optional)" : "Password"}
+      <input type="password" name="password" ${row.id ? "" : "required"} minlength="6">
+    </label>
+    <label class="check"><input type="checkbox" name="is_active" ${row.is_active !== false ? "checked" : ""}> Account active</label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary">Save access</button>
+    </div>`, async (data) => {
+    data.is_active = !!data.is_active;
+    if (!data.password) delete data.password;
+    const url = row.id ? `/api/users/${row.id}` : "/api/users";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    loadUsers();
+  });
+}
+
+async function removeUser(id) {
+  if (!confirm("Delete this user account?")) return;
+  const res = await CIAS.api(`/api/users/${id}`, { method: "DELETE" });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadUsers();
+}
+</script>
+{% endblock %}

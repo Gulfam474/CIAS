@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Time Slots · CIAS{% endblock %}
+{% block heading %}Time slots{% endblock %}
+{% block lede %}College periods used by the timetable and availability search.{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <button class="btn primary" id="add-slot">Add time slot</button>
+</div>
+<article class="panel">
+  <div id="slot-table" class="table-wrap"></div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("add-slot").onclick = () => openSlot();
+  loadSlots();
+});
+
+async function loadSlots() {
+  const res = await CIAS.api("/api/timeslots");
+  const rows = res.data || [];
+  document.getElementById("slot-table").innerHTML = CIAS.table(
+    ["Order", "Name", "Start", "End", "Type", ""],
+    rows.map((s) => [
+      s.sort_order,
+      s.name,
+      s.start_time,
+      s.end_time,
+      s.is_break ? `<span class="pill cancelled">Break</span>` : `<span class="pill confirmed">Teaching</span>`,
+      `<button class="link" onclick='openSlot(${JSON.stringify(s)})'>Edit</button>
+       <button class="link danger" onclick="removeSlot(${s.id})">Delete</button>`,
+    ])
+  );
+}
+
+function openSlot(row = {}) {
+  CIAS.openModal(row.id ? "Edit time slot" : "Add time slot", `
+    <label>Name <input name="name" value="${row.name || ""}" placeholder="Period 5" required></label>
+    <label>Start <input type="time" name="start_time" value="${row.start_time || "09:00"}" required></label>
+    <label>End <input type="time" name="end_time" value="${row.end_time || "10:00"}" required></label>
+    <label>Sort order <input type="number" name="sort_order" value="${row.sort_order || 1}"></label>
+    <label class="check"><input type="checkbox" name="is_break" ${row.is_break ? "checked" : ""}> This is a break (not bookable)</label>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn primary">Save</button>
+    </div>`, async (data) => {
+    data.is_break = !!data.is_break;
+    data.sort_order = Number(data.sort_order || 0);
+    const url = row.id ? `/api/timeslots/${row.id}` : "/api/timeslots";
+    const res = await CIAS.api(url, { method: row.id ? "PUT" : "POST", body: data });
+    if (!res.ok) return CIAS.toast(res.error, "error");
+    CIAS.closeModal();
+    loadSlots();
+  });
+}
+
+async function removeSlot(id) {
+  if (!confirm("Delete this time slot?")) return;
+  const res = await CIAS.api(`/api/timeslots/${id}`, { method: "DELETE" });
+  if (!res.ok) return CIAS.toast(res.error, "error");
+  loadSlots();
+}
+</script>
+{% endblock %}
