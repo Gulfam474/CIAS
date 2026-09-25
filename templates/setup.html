@@ -147,7 +147,7 @@ function classroomForm() {
 }
 
 function slotForm() {
-  const rows = (state.data.timeslots || []).map((s) => `<li><b>${s.name}</b> · ${s.start_time} – ${s.end_time}${s.is_break ? " (break)" : ""}</li>`).join("");
+  const rows = (state.data.timeslots || []).map((s) => `<li><b>${s.name}</b> · ${s.start_time_12} – ${s.end_time_12}${s.is_break ? " (break)" : ""}</li>`).join("");
   return `
     <p class="eyebrow">Step 4 of 4</p>
     <h2>Add a time slot</h2>

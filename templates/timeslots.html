@@ -27,8 +27,8 @@ async function loadSlots() {
     rows.map((s) => [
       s.sort_order,
       s.name,
-      s.start_time,
-      s.end_time,
+      s.start_time_12,
+      s.end_time_12,
       s.is_break ? `<span class="pill cancelled">Break</span>` : `<span class="pill confirmed">Teaching</span>`,
       `<button class="link" onclick='openSlot(${JSON.stringify(s)})'>Edit</button>
        <button class="link danger" onclick="removeSlot(${s.id})">Delete</button>`,

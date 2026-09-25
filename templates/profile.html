@@ -19,9 +19,6 @@
       <li><span>Admin access</span><b>{{ "Yes" if current_user.is_admin else "No" }}</b></li>
       <li><span>Can assign roles</span><b>{{ "Yes — Super Admin" if current_user.is_super_admin else "No" }}</b></li>
     </ul>
-    {% if campus and campus.complete %}
-    <button type="button" class="btn" data-start-tour>Replay product tour</button>
-    {% endif %}
   </article>
   <article class="panel">
     <header class="panel-head"><div><h2>Update details</h2></div></header>

@@ -15,9 +15,12 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    otp_code = db.Column(db.String(6), default=None)
+    otp_expires_at = db.Column(db.DateTime, default=None)
     role = db.Column(db.String(20), nullable=False, default="staff")
     department = db.Column(db.String(80), default="")
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
@@ -174,8 +177,17 @@ class TimeSlot(db.Model):
     sort_order = db.Column(db.Integer, default=0)
     is_break = db.Column(db.Boolean, default=False, nullable=False)
 
+    @staticmethod
+    def to_12h(value):
+        try:
+            hour, minute = (int(part) for part in value.split(":")[:2])
+        except (AttributeError, ValueError):
+            return value or ""
+        suffix = "AM" if hour < 12 else "PM"
+        return f"{hour % 12 or 12}:{minute:02d} {suffix}"
+
     def label(self):
-        return f"{self.name} ({self.start_time} – {self.end_time})"
+        return f"{self.name} ({self.to_12h(self.start_time)} – {self.to_12h(self.end_time)})"
 
     def to_dict(self):
         return {
@@ -183,6 +195,8 @@ class TimeSlot(db.Model):
             "name": self.name,
             "start_time": self.start_time,
             "end_time": self.end_time,
+            "start_time_12": self.to_12h(self.start_time),
+            "end_time_12": self.to_12h(self.end_time),
             "sort_order": self.sort_order,
             "is_break": self.is_break,
             "label": self.label(),

@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 :root {
   --navy: #12243a;
   --navy-2: #1b3354;
@@ -76,13 +77,15 @@ body:not(.login-body) {
 
 .shell { min-width: 0; }
 .topbar {
-  display: flex; justify-content: space-between; gap: 20px; align-items: center;
+  display: flex; justify-content: space-between; gap: 20px; align-items: center; flex-wrap: wrap;
   padding: 22px 28px 8px;
 }
+.topbar > div:first-child { flex: 1 1 320px; min-width: 0; }
 .topbar h1 { margin: 0; font-size: 30px; }
 .lede { margin: 4px 0 0; color: var(--muted); }
 
-.userchip { display: flex; align-items: center; gap: 10px; }
+.userchip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.userchip .ghost { white-space: nowrap; }
 .userchip > div strong { display: block; font-size: 14px; }
 .avatar {
   width: 40px; height: 40px; border-radius: 50%;
@@ -128,8 +131,13 @@ body:not(.login-body) {
 
 .split { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
 .toolbar { display: flex; gap: 10px; align-items: end; margin-bottom: 14px; flex-wrap: wrap; }
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
-.filters .btn { height: 42px; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filters > * { flex: 1 1 160px; min-width: 0; }
+.filters > label:has(select[name="timeslot_id"]) { flex: 2 1 260px; }
+.filters > label:has(input[type="number"]) { flex: 0 1 110px; }
+.filters > .btn { flex: 0 0 auto; height: 42px; }
+.filters label { grid-template-columns: minmax(0, 1fr); }
+.filters select, .filters input { width: 100%; min-width: 0; text-overflow: ellipsis; }
 
 label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--navy); }
 input, select, textarea {
@@ -395,6 +403,6 @@ body.tour-open .userchip a { pointer-events: none; }
 
 @media (max-width: 1100px) {
   .stat-grid, .role-guide, .split, .login-wrap { grid-template-columns: 1fr; }
-  body:not(.login-body) { grid-template-columns: 1fr; }
+  body:not(.login-body) { grid-template-columns: minmax(0, 1fr); }
   .sidebar { height: auto; position: relative; }
 }

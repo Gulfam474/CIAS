@@ -60,11 +60,6 @@ const CIASTour = {
     },
   ],
 
-  shouldStart() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("tour") === "1" || sessionStorage.getItem("cias_start_tour") === "1";
-  },
-
   init() {
     document.querySelectorAll("[data-start-tour]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -72,11 +67,6 @@ const CIASTour = {
         this.start();
       });
     });
-    if (document.getElementById("onboard")) return;
-    if (this.shouldStart()) {
-      sessionStorage.removeItem("cias_start_tour");
-      this.start();
-    }
   },
 
   collectSteps() {
@@ -208,11 +198,6 @@ const CIASTour = {
     document.querySelectorAll(".tour-target").forEach((el) => el.classList.remove("tour-target"));
     document.body.classList.remove("tour-open");
     if (this.root) this.root.hidden = true;
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("tour")) {
-      url.searchParams.delete("tour");
-      window.history.replaceState({}, "", url.pathname + (url.search || ""));
-    }
   },
 };
 

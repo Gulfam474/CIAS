@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Email · CIAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .otp-input-group {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+      justify-content: center;
+    }
+    .otp-input {
+      width: 44px;
+      height: 44px;
+      font-size: 20px;
+      text-align: center;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .otp-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .resend-link {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    .resend-link a {
+      color: #2563eb;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .resend-link a:hover {
+      text-decoration: underline;
+    }
+    .email-hint {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="login-body">
+  <div class="login-wrap">
+    <section class="login-hero">
+      <div class="crest large"><span>C</span></div>
+      <h1>Classroom Information and Availability System</h1>
+      <p>Find a free classroom for extra lectures, replacements, and academic meetings — without walking the timetable by hand.</p>
+      <ul>
+        <li>Organised buildings, floors and room capacity</li>
+        <li>Live check against the college timetable</li>
+        <li>Role-based access for Super Admin, Admin and Staff</li>
+      </ul>
+    </section>
+    <section class="login-card">
+      <p class="eyebrow">Email Verification</p>
+      <h2>Verify Your Email</h2>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="toast {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+      <div class="email-hint">
+        We've sent a 6-digit OTP to<br>
+        <strong>{{ email }}</strong>
+      </div>
+      <form method="post" class="stack">
+        <label>Enter OTP
+          <input type="text" name="otp_code" placeholder="000000" maxlength="6" required autofocus pattern="[0-9]{6}">
+        </label>
+        <button type="submit" class="btn primary wide">Verify</button>
+      </form>
+      <div class="resend-link">
+        <p>Didn't receive the OTP?</p>
+        <a onclick="resendOTP({{ user_id }})">Resend OTP</a>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function resendOTP(userId) {
+      fetch(`/api/resend-otp/${userId}`, {
+        method: 'POST',
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.ok) {
+          alert('OTP sent to your email. Check your inbox!');
+        } else {
+          alert('Failed to resend OTP. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+      });
+    }
+  </script>
+</body>
+</html>

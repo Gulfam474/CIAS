@@ -42,8 +42,7 @@ const CIASSetup = {
 
   closeAndReload() {
     if (this.root) this.root.hidden = true;
-    sessionStorage.setItem("cias_start_tour", "1");
-    window.location.href = this.searchUrl || "/?tour=1";
+    window.location.href = this.searchUrl || "/";
   },
 
   paintStepper() {
@@ -163,7 +162,7 @@ const CIASSetup = {
 
   slotForm() {
     const rows = (this.state.data.timeslots || []).map((s) =>
-      `<li><b>${s.name}</b> · ${s.start_time} – ${s.end_time}${s.is_break ? " (break)" : ""}</li>`
+      `<li><b>${s.name}</b> · ${s.start_time_12} – ${s.end_time_12}${s.is_break ? " (break)" : ""}</li>`
     ).join("");
     return `
       <p class="eyebrow">Step 4 of 4</p>

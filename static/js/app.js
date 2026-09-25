@@ -82,15 +82,4 @@ document.addEventListener("click", (e) => {
     const toast = e.target.closest(".toast");
     if (toast) toast.remove();
   }
-  if (e.target.closest("[data-toast-next]")) {
-    e.preventDefault();
-    const toast = e.target.closest(".toast");
-    if (toast) toast.remove();
-    sessionStorage.setItem("cias_start_tour", "1");
-    if (window.CIASTour && typeof window.CIASTour.start === "function") {
-      window.CIASTour.start();
-    } else {
-      window.location.href = "/?tour=1";
-    }
-  }
 });

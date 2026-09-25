@@ -1,8 +1,15 @@
 import os
-from datetime import datetime
+import random
+import re
+import string
+from datetime import datetime, timedelta
 from functools import wraps
 
 from dotenv import load_dotenv
+
+# Load environment variables before importing config
+load_dotenv()
+
 from flask import (
     Flask,
     flash,
@@ -19,6 +26,7 @@ from flask_login import (
     login_user,
     logout_user,
 )
+from flask_mail import Mail, Message
 from sqlalchemy import create_engine, inspect, or_, text
 
 from config import Config
@@ -33,14 +41,13 @@ from models import (
     db,
 )
 
-load_dotenv()
-
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 ROOM_TYPES = ["Lecture Hall", "Laboratory", "Seminar Room", "Conference Room", "Auditorium"]
 BOOKING_STATUSES = ["confirmed", "cancelled"]
 
 login_manager = LoginManager()
 login_manager.login_view = "login"
+mail = Mail()
 
 
 def create_app():
@@ -49,6 +56,7 @@ def create_app():
     _configure_database(app)
     db.init_app(app)
     login_manager.init_app(app)
+    mail.init_app(app)
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -59,7 +67,6 @@ def create_app():
     with app.app_context():
         db.create_all()
         _ensure_schema()
-        _ensure_default_admin()
 
     register_routes(app)
     return app
@@ -112,51 +119,42 @@ def _ensure_schema():
             db.session.commit()
 
 
-def _ensure_default_admin():
-    demos = [
-        {
-            "username": "admin",
-            "password": "admin123",
-            "full_name": "System Administrator",
-            "email": "admin@cias.college",
-            "role": "super_admin",
-            "department": "Administration",
-        },
-        {
-            "username": "registrar",
-            "password": "admin123",
-            "full_name": "Priya Nair",
-            "email": "registrar@cias.college",
-            "role": "admin",
-            "department": "Academic Office",
-        },
-        {
-            "username": "faculty",
-            "password": "staff123",
-            "full_name": "Anita Deshmukh",
-            "email": "anita@cias.college",
-            "role": "staff",
-            "department": "Computer Science",
-        },
-    ]
-    changed = False
-    for item in demos:
-        user = User.query.filter_by(username=item["username"]).first()
-        if user:
-            continue
-        user = User(
-            username=item["username"],
-            full_name=item["full_name"],
-            email=item["email"],
-            role=item["role"],
-            department=item["department"],
-            is_active=True,
+def _generate_otp():
+    return ''.join(random.choices(string.digits, k=6))
+
+
+def _send_otp_email(user_email, otp_code):
+    try:
+        msg = Message(
+            subject="Verify your email - CIAS",
+            recipients=[user_email],
+            body=f"""
+Welcome to CIAS!
+
+Your OTP verification code is: {otp_code}
+
+This code will expire in 10 minutes.
+
+If you didn't request this, please ignore this email.
+            """.strip(),
+            html=f"""
+<h2>Welcome to CIAS!</h2>
+<p>Your OTP verification code is:</p>
+<h1 style="color: #2563eb; font-size: 32px; letter-spacing: 4px;">{otp_code}</h1>
+<p>This code will expire in 10 minutes.</p>
+<p>If you didn't request this, please ignore this email.</p>
+            """.strip()
         )
-        user.set_password(item["password"])
-        db.session.add(user)
-        changed = True
-    if changed:
-        db.session.commit()
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send OTP email: {e}")
+        return False
+
+
+def _validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 
 @login_manager.user_loader
@@ -291,6 +289,9 @@ def register_routes(app):
             if not user or not user.check_password(password):
                 flash("Invalid username or password.", "error")
                 return render_template("login.html")
+            if Config.USE_EMAIL_VERIFICATION and not user.email_verified:
+                flash("Please verify your email before signing in.", "warning")
+                return redirect(url_for("verify_email", user_id=user.id))
             if not user.is_active:
                 flash("This account has been deactivated. Contact a Super Admin.", "error")
                 return render_template("login.html")
@@ -300,6 +301,135 @@ def register_routes(app):
             flash(f"Welcome back, {user.full_name}. You are signed in as {user.role_label}.", "success")
             return redirect(url_for("dashboard"))
         return render_template("login.html")
+
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            username = (request.form.get("username") or "").strip()
+            email = (request.form.get("email") or "").strip().lower()
+            full_name = (request.form.get("full_name") or "").strip()
+            password = request.form.get("password") or ""
+            confirm_password = request.form.get("confirm_password") or ""
+
+            if not all([username, email, full_name, password]):
+                flash("All fields are required.", "error")
+                return render_template("register.html")
+
+            if not _validate_email(email):
+                flash("Please enter a valid email address (e.g., user@example.com).", "error")
+                return render_template("register.html")
+
+            if len(password) < 6:
+                flash("Password must be at least 6 characters.", "error")
+                return render_template("register.html")
+
+            if password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return render_template("register.html")
+
+            if User.query.filter_by(username=username).first():
+                flash("Username already exists.", "error")
+                return render_template("register.html")
+
+            if User.query.filter_by(email=email).first():
+                flash("Email already registered.", "error")
+                return render_template("register.html")
+
+            user = User(
+                username=username,
+                full_name=full_name,
+                email=email,
+                role="staff",
+                email_verified=not Config.USE_EMAIL_VERIFICATION,
+                is_active=not Config.USE_EMAIL_VERIFICATION,
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+
+            if Config.USE_EMAIL_VERIFICATION:
+                otp_code = _generate_otp()
+                user.otp_code = otp_code
+                user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+                db.session.commit()
+
+                if _send_otp_email(user.email, otp_code):
+                    flash("Account created! Check your email for the OTP.", "success")
+                    return redirect(url_for("verify_email", user_id=user.id))
+                else:
+                    db.session.delete(user)
+                    db.session.commit()
+                    flash("Failed to send verification email. Please try again.", "error")
+                    return render_template("register.html")
+            else:
+                flash("Account created successfully! You can now sign in.", "success")
+                return redirect(url_for("login"))
+
+        return render_template("register.html")
+
+    @app.route("/verify-email/<int:user_id>", methods=["GET", "POST"])
+    def verify_email(user_id):
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+
+        if not Config.USE_EMAIL_VERIFICATION:
+            flash("Email verification is disabled.", "error")
+            return redirect(url_for("login"))
+
+        user = User.query.get(user_id)
+        if not user:
+            flash("Invalid verification link.", "error")
+            return redirect(url_for("register"))
+
+        if request.method == "POST":
+            otp_code = (request.form.get("otp_code") or "").strip()
+
+            if not otp_code:
+                flash("OTP is required.", "error")
+                return render_template("verify_email.html", user_id=user_id)
+
+            if user.otp_expires_at and datetime.utcnow() > user.otp_expires_at:
+                flash("OTP has expired. Please request a new one.", "error")
+                return render_template("verify_email.html", user_id=user_id)
+
+            if user.otp_code != otp_code:
+                flash("Invalid OTP. Please try again.", "error")
+                return render_template("verify_email.html", user_id=user_id)
+
+            user.email_verified = True
+            user.is_active = True
+            user.otp_code = None
+            user.otp_expires_at = None
+            db.session.commit()
+
+            flash("Email verified successfully! You can now sign in.", "success")
+            return redirect(url_for("login"))
+
+        return render_template("verify_email.html", user_id=user_id, email=user.email)
+
+    @app.route("/api/resend-otp/<int:user_id>", methods=["POST"])
+    def resend_otp(user_id):
+        if not Config.USE_EMAIL_VERIFICATION:
+            return json_error("Email verification is disabled", 400)
+
+        user = User.query.get(user_id)
+        if not user:
+            return json_error("User not found", 404)
+
+        if user.email_verified:
+            return json_error("Email already verified", 400)
+
+        otp_code = _generate_otp()
+        user.otp_code = otp_code
+        user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        db.session.commit()
+
+        if _send_otp_email(user.email, otp_code):
+            return json_ok(message="OTP sent to your email")
+        else:
+            return json_error("Failed to send OTP", 500)
 
     @app.route("/logout")
     @login_required
@@ -342,17 +472,11 @@ def register_routes(app):
         recent_bookings = (
             Booking.query.order_by(Booking.created_at.desc()).limit(6).all()
         )
-        admins = (
-            User.query.filter(User.role.in_(["super_admin", "admin"]))
-            .order_by(User.role, User.full_name)
-            .all()
-        )
         return render_template(
             "dashboard.html",
             stats=stats,
             occupancy=occupancy,
             recent_bookings=recent_bookings,
-            admins=admins,
             current_slot=current_slot,
             today=today,
         )
@@ -825,13 +949,11 @@ def register_routes(app):
         error = _validate_allocation(data)
         if error:
             return json_error(error)
-        clash = Timetable.query.filter_by(
-            classroom_id=int(data["classroom_id"]),
-            day_of_week=data["day_of_week"],
-            timeslot_id=int(data["timeslot_id"]),
-        ).first()
+        clash = _find_timetable_clash(
+            int(data["classroom_id"]), data["day_of_week"], int(data["timeslot_id"])
+        )
         if clash:
-            return json_error("This classroom is already allocated for that day and time.")
+            return json_error(_clash_message(clash))
         booking = Booking.query.filter_by(
             classroom_id=int(data["classroom_id"]),
             day_of_week=data["day_of_week"],
@@ -867,14 +989,14 @@ def register_routes(app):
         error = _validate_allocation(data)
         if error:
             return json_error(error)
-        clash = Timetable.query.filter(
-            Timetable.classroom_id == int(data["classroom_id"]),
-            Timetable.day_of_week == data["day_of_week"],
-            Timetable.timeslot_id == int(data["timeslot_id"]),
-            Timetable.id != item_id,
-        ).first()
+        clash = _find_timetable_clash(
+            int(data["classroom_id"]),
+            data["day_of_week"],
+            int(data["timeslot_id"]),
+            exclude_id=item_id,
+        )
         if clash:
-            return json_error("This classroom is already allocated for that day and time.")
+            return json_error(_clash_message(clash))
         row.classroom_id = int(data["classroom_id"])
         row.day_of_week = data["day_of_week"]
         row.timeslot_id = int(data["timeslot_id"])
@@ -1151,6 +1273,33 @@ def _normalize_time(value):
         return parsed.strftime("%H:%M")
     except ValueError:
         return value
+
+
+def _find_timetable_clash(classroom_id, day, timeslot_id, exclude_id=None):
+    slot = db.session.get(TimeSlot, timeslot_id)
+    if not slot:
+        return None
+    overlapping_ids = [
+        s.id
+        for s in TimeSlot.query.filter(
+            TimeSlot.start_time < slot.end_time, TimeSlot.end_time > slot.start_time
+        )
+    ]
+    q = Timetable.query.filter(
+        Timetable.classroom_id == classroom_id,
+        Timetable.day_of_week == day,
+        Timetable.timeslot_id.in_(overlapping_ids),
+    )
+    if exclude_id:
+        q = q.filter(Timetable.id != exclude_id)
+    return q.first()
+
+
+def _clash_message(clash):
+    return (
+        f"Clash: Room {clash.classroom.room_number} already has "
+        f"'{clash.subject}' on {clash.day_of_week}, {clash.timeslot.label()}."
+    )
 
 
 def _current_timeslot(slots):

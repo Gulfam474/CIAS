@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account · CIAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .email-validation {
+      font-size: 13px;
+      margin-top: 4px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+    .email-validation.show {
+      display: flex;
+    }
+    .email-validation.valid {
+      background-color: #ecfdf5;
+      color: #047857;
+      border: 1px solid #d1fae5;
+    }
+    .email-validation.invalid {
+      background-color: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fee2e2;
+    }
+    .validation-icon {
+      font-size: 16px;
+    }
+
+    .password-validation {
+      margin-top: 8px;
+      display: none;
+    }
+    .password-validation.show {
+      display: block;
+    }
+
+    .password-strength {
+      margin-bottom: 8px;
+    }
+    .strength-bar {
+      height: 6px;
+      background-color: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .strength-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease, background-color 0.3s ease;
+      background-color: #ef4444;
+    }
+    .strength-fill.weak {
+      width: 33%;
+      background-color: #ef4444;
+    }
+    .strength-fill.medium {
+      width: 66%;
+      background-color: #f59e0b;
+    }
+    .strength-fill.strong {
+      width: 100%;
+      background-color: #10b981;
+    }
+
+    .strength-text {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .strength-text.weak {
+      color: #dc2626;
+    }
+    .strength-text.medium {
+      color: #d97706;
+    }
+    .strength-text.strong {
+      color: #059669;
+    }
+
+    .password-requirements {
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .requirement {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #6b7280;
+    }
+    .requirement.met {
+      color: #10b981;
+    }
+    .requirement-icon {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .password-match {
+      font-size: 13px;
+      margin-top: 4px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+    .password-match.show {
+      display: flex;
+    }
+    .password-match.valid {
+      background-color: #ecfdf5;
+      color: #047857;
+      border: 1px solid #d1fae5;
+    }
+    .password-match.invalid {
+      background-color: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fee2e2;
+    }
+  </style>
+</head>
+<body class="login-body">
+  <div class="login-wrap">
+    <section class="login-hero">
+      <div class="crest large"><span>C</span></div>
+      <h1>Classroom Information and Availability System</h1>
+      <p>Find a free classroom for extra lectures, replacements, and academic meetings — without walking the timetable by hand.</p>
+      <ul>
+        <li>Organised buildings, floors and room capacity</li>
+        <li>Live check against the college timetable</li>
+        <li>Role-based access for Super Admin, Admin and Staff</li>
+      </ul>
+    </section>
+    <section class="login-card">
+      <p class="eyebrow">College Registry</p>
+      <h2>Create Account</h2>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="toast {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post" class="stack" id="registerForm">
+        <label>Full Name
+          <input type="text" name="full_name" required autofocus>
+        </label>
+        <label>Username
+          <input type="text" name="username" required>
+        </label>
+        <div>
+          <label>Email
+            <input type="email" id="emailInput" name="email" required>
+          </label>
+          <div id="emailValidation" class="email-validation">
+            <span class="validation-icon" id="validationIcon"></span>
+            <span id="validationText"></span>
+          </div>
+        </div>
+        <div>
+          <label>Password
+            <input type="password" id="passwordInput" name="password" required minlength="6">
+          </label>
+          <div id="passwordValidation" class="password-validation">
+            <div class="password-strength">
+              <div class="strength-bar">
+                <div id="strengthFill" class="strength-fill"></div>
+              </div>
+              <div id="strengthText" class="strength-text"></div>
+            </div>
+            <div class="password-requirements">
+              <div class="requirement" id="req-length">
+                <span class="requirement-icon">○</span>
+                <span>At least 6 characters</span>
+              </div>
+              <div class="requirement" id="req-uppercase">
+                <span class="requirement-icon">○</span>
+                <span>One uppercase letter (A-Z)</span>
+              </div>
+              <div class="requirement" id="req-lowercase">
+                <span class="requirement-icon">○</span>
+                <span>One lowercase letter (a-z)</span>
+              </div>
+              <div class="requirement" id="req-number">
+                <span class="requirement-icon">○</span>
+                <span>One number (0-9)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label>Confirm Password
+            <input type="password" id="confirmPasswordInput" name="confirm_password" required minlength="6">
+          </label>
+          <div id="passwordMatch" class="password-match">
+            <span class="validation-icon" id="matchIcon"></span>
+            <span id="matchText"></span>
+          </div>
+        </div>
+        <button type="submit" class="btn primary wide" id="submitBtn">Create Account</button>
+      </form>
+      <p style="text-align: center; margin-top: 16px;">
+        Already have an account? <a href="{{ url_for('login') }}">Sign in here</a>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const emailInput = document.getElementById('emailInput');
+    const emailValidation = document.getElementById('emailValidation');
+    const validationIcon = document.getElementById('validationIcon');
+    const validationText = document.getElementById('validationText');
+    const passwordInput = document.getElementById('passwordInput');
+    const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+    const passwordValidation = document.getElementById('passwordValidation');
+    const passwordMatch = document.getElementById('passwordMatch');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Email validation regex pattern (same as backend)
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    function validateEmail(email) {
+      return emailPattern.test(email);
+    }
+
+    // Password validation functions
+    function getPasswordStrength(password) {
+      let strength = 0;
+      const checks = {
+        length: password.length >= 6,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /[0-9]/.test(password)
+      };
+
+      if (checks.length) strength++;
+      if (checks.uppercase) strength++;
+      if (checks.lowercase) strength++;
+      if (checks.number) strength++;
+
+      return { strength, checks };
+    }
+
+    function updatePasswordValidation() {
+      const password = passwordInput.value;
+
+      if (!password) {
+        passwordValidation.classList.remove('show');
+        return;
+      }
+
+      const { strength, checks } = getPasswordStrength(password);
+      passwordValidation.classList.add('show');
+
+      // Update strength bar
+      const strengthFill = document.getElementById('strengthFill');
+      const strengthText = document.getElementById('strengthText');
+
+      strengthFill.classList.remove('weak', 'medium', 'strong');
+      strengthText.classList.remove('weak', 'medium', 'strong');
+
+      if (strength <= 1) {
+        strengthFill.classList.add('weak');
+        strengthText.classList.add('weak');
+        strengthText.textContent = 'Weak password';
+      } else if (strength <= 2) {
+        strengthFill.classList.add('medium');
+        strengthText.classList.add('medium');
+        strengthText.textContent = 'Medium password';
+      } else if (strength >= 3) {
+        strengthFill.classList.add('strong');
+        strengthText.classList.add('strong');
+        strengthText.textContent = 'Strong password';
+      }
+
+      // Update requirements
+      updateRequirement('req-length', checks.length);
+      updateRequirement('req-uppercase', checks.uppercase);
+      updateRequirement('req-lowercase', checks.lowercase);
+      updateRequirement('req-number', checks.number);
+
+      // Check password match
+      checkPasswordMatch();
+    }
+
+    function updateRequirement(elementId, met) {
+      const element = document.getElementById(elementId);
+      const icon = element.querySelector('.requirement-icon');
+
+      if (met) {
+        element.classList.add('met');
+        icon.textContent = '✓';
+      } else {
+        element.classList.remove('met');
+        icon.textContent = '○';
+      }
+    }
+
+    function checkPasswordMatch() {
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+
+      if (!confirmPassword) {
+        passwordMatch.classList.remove('show');
+        return;
+      }
+
+      passwordMatch.classList.add('show');
+      const matchIcon = document.getElementById('matchIcon');
+      const matchText = document.getElementById('matchText');
+
+      if (password === confirmPassword) {
+        passwordMatch.classList.remove('invalid');
+        passwordMatch.classList.add('valid');
+        matchIcon.textContent = '✓';
+        matchText.textContent = 'Passwords match';
+      } else {
+        passwordMatch.classList.remove('valid');
+        passwordMatch.classList.add('invalid');
+        matchIcon.textContent = '✕';
+        matchText.textContent = 'Passwords do not match';
+      }
+    }
+
+    function updateSubmitButtonState() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+      const { checks } = getPasswordStrength(password);
+
+      const isEmailValid = !email || validateEmail(email);
+      const isPasswordStrong = checks.length && checks.uppercase && checks.lowercase && checks.number;
+      const isPasswordMatch = !confirmPassword || (password === confirmPassword && password.length >= 6);
+
+      submitBtn.disabled = !isEmailValid || !isPasswordStrong || !isPasswordMatch;
+    }
+
+    // Email validation
+    emailInput.addEventListener('input', function() {
+      const email = this.value.trim();
+
+      if (!email) {
+        emailValidation.classList.remove('show');
+        updateSubmitButtonState();
+        return;
+      }
+
+      const isValid = validateEmail(email);
+      emailValidation.classList.add('show');
+
+      if (isValid) {
+        emailValidation.classList.remove('invalid');
+        emailValidation.classList.add('valid');
+        validationIcon.textContent = '✓';
+        validationText.textContent = 'Valid email address';
+      } else {
+        emailValidation.classList.remove('valid');
+        emailValidation.classList.add('invalid');
+        validationIcon.textContent = '✕';
+        validationText.textContent = 'Invalid email format (e.g., user@example.com)';
+      }
+      updateSubmitButtonState();
+    });
+
+    emailInput.addEventListener('blur', function() {
+      if (!this.value.trim()) {
+        emailValidation.classList.remove('show');
+      }
+      updateSubmitButtonState();
+    });
+
+    // Password validation
+    passwordInput.addEventListener('input', function() {
+      updatePasswordValidation();
+      updateSubmitButtonState();
+    });
+
+    confirmPasswordInput.addEventListener('input', function() {
+      checkPasswordMatch();
+      updateSubmitButtonState();
+    });
+
+    // Form submission
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+      const email = emailInput.value.trim();
+      const { checks } = getPasswordStrength(passwordInput.value);
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+
+      if (email && !validateEmail(email)) {
+        e.preventDefault();
+        emailValidation.classList.add('show', 'invalid');
+        return;
+      }
+
+      if (!checks.length || !checks.uppercase || !checks.lowercase || !checks.number) {
+        e.preventDefault();
+        passwordValidation.classList.add('show');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        e.preventDefault();
+        passwordMatch.classList.add('show', 'invalid');
+        return;
+      }
+    });
+  </script>
+</body>
+</html>

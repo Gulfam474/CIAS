@@ -25,6 +25,17 @@ class Config:
 
     SQLALCHEMY_DATABASE_URI = MYSQL_URI if USE_MYSQL else SQLITE_URI
 
+    # Email Verification
+    USE_EMAIL_VERIFICATION = os.getenv("USE_EMAIL_VERIFICATION", "True") == "True"
+
+    # Email Configuration
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+    MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "True") == "True"
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+    MAIL_FROM = os.getenv("MAIL_FROM", "noreply@cias.college")
+
     # Roles
     ROLE_SUPER_ADMIN = "super_admin"
     ROLE_ADMIN = "admin"

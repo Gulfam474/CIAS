@@ -91,6 +91,7 @@
           <strong>{{ current_user.full_name }}</strong>
           <span class="role-badge role-{{ current_user.role }}">{{ current_user.role_label }}</span>
         </div>
+        <button type="button" class="ghost" data-start-tour>Take a tour</button>
         <a class="ghost" href="{{ url_for('profile') }}">Profile</a>
         <a class="ghost danger" href="{{ url_for('logout') }}">Sign out</a>
       </div>
@@ -103,13 +104,6 @@
             <div class="toast {{ category }}">
               <span>{{ message }}</span>
               <button type="button" class="toast-x" data-dismiss-toast aria-label="Close">×</button>
-              {% if 'Welcome back' in message %}
-              <div class="toast-actions">
-                <button type="button" class="btn" data-dismiss-toast>Skip</button>
-                <button type="button" class="btn" data-dismiss-toast>Close</button>
-                <button type="button" class="btn primary" data-toast-next>Next</button>
-              </div>
-              {% endif %}
             </div>
           {% endfor %}
       {% endif %}
@@ -137,7 +131,7 @@
     id="onboard"
     {% if current_user.is_admin %}
     data-step="{{ campus.step }}"
-    data-search-url="{{ url_for('dashboard') }}?tour=1"
+    data-search-url="{{ url_for('dashboard') }}"
     data-room-types='{{ ROOM_TYPES | tojson }}'
     {% endif %}
   >

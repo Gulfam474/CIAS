@@ -38,11 +38,15 @@ The system can show:
 
 ## Features
 
+- Self-service sign-up with optional email OTP verification
+- Live form validation for email format and password strength
 - Role-based access: **Super Admin**, **Admin**, **Staff**
 - Identify who is an admin and assign or revoke access
 - Campus setup wizard when buildings, floors, classrooms, or time slots are missing
-- Product tour after setup
+- Optional product tour, started from the **Take a tour** button in the header
 - Find empty classrooms by day, time, location, and capacity
+- Timetable clash detection based on actual start and end times
+- Times shown in 12-hour AM/PM format
 - Extra-class bookings that block a room like the timetable does
 - Occupancy view and weekly utilization reports
 
@@ -57,7 +61,30 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` with your MySQL user and password (`USE_MYSQL=1`). The app creates the `cias` database if it does not exist.
+Edit `.env` with your MySQL user and password (`USE_MYSQL=1`). The app creates the `cias` database if it does not exist. Set `USE_MYSQL=0` to use a local SQLite file (`cias.db`) instead.
+
+### Email verification
+
+New accounts can be required to confirm their email with a 6-digit code (OTP) before signing in. Codes expire after 10 minutes and can be resent from the verification page.
+
+| Variable | Purpose |
+| --- | --- |
+| `USE_EMAIL_VERIFICATION` | `True` to require the OTP, `False` to activate accounts immediately |
+| `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USE_TLS` | SMTP server settings |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP login (for Gmail, use an [App Password](https://myaccount.google.com/apppasswords)) |
+| `MAIL_FROM` | Sender address shown on the email |
+
+If SMTP is not configured, set `USE_EMAIL_VERIFICATION=False`; otherwise sign-up fails because the code cannot be sent.
+
+### Upgrading an existing MySQL database
+
+Tables are created automatically, but new columns are not added to an existing `users` table. If you set up CIAS before sign-up was added, run once:
+
+```sql
+ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN otp_code VARCHAR(6) DEFAULT NULL;
+ALTER TABLE users ADD COLUMN otp_expires_at DATETIME DEFAULT NULL;
+```
 
 ### Dummy data for testing
 
@@ -65,7 +92,7 @@ Edit `.env` with your MySQL user and password (`USE_MYSQL=1`). The app creates t
 python populate_dummy_data.py
 ```
 
-This loads buildings, floors, classrooms, time slots, and timetable rows used in the project example (including Room 204 and Room 305). Accounts are kept. To fill empty tables only:
+This loads buildings, floors, classrooms, time slots, and timetable rows used in the project example (including Room 204 and Room 305). User accounts are not changed. To fill empty tables only:
 
 ```bash
 python populate_dummy_data.py --keep
@@ -87,24 +114,42 @@ Desktop window:
 python run_desktop.py
 ```
 
-## Demo accounts
+## Accounts
 
-| Username | Password | Role | Access |
-| --- | --- | --- | --- |
-| `admin` | `admin123` | Super Admin | Full access, including assigning roles |
-| `registrar` | `admin123` | Admin | Campus data, timetable, search, bookings, reports |
-| `hod.cs` | `admin123` | Admin | Same as Admin |
-| `faculty` | `staff123` | Staff | Search, occupancy, own bookings |
-| `lab.assistant` | `staff123` | Staff | Search, occupancy, own bookings |
+There are no built-in demo accounts. Open **Create one here** on the sign-in page to register. New accounts get the **Staff** role.
 
-Change these passwords after first login.
+To create the first Super Admin, register an account and promote it in the database:
+
+```sql
+UPDATE users SET role = 'super_admin' WHERE username = 'your-username';
+```
+
+After that, the Super Admin can assign Admin or Staff roles from **Users & Roles**.
+
+| Role | Access |
+| --- | --- |
+| Super Admin | Full access, including assigning roles |
+| Admin | Campus data, timetable, search, bookings, reports |
+| Staff | Search, occupancy, own bookings |
+
+## Timetable clash rules
+
+A room cannot hold two classes at the same time on the same day. A class may start exactly when another ends. For a room with a class from 10:00 to 11:00 AM:
+
+| New class | Result |
+| --- | --- |
+| 9:00 – 10:00 AM | Allowed (ends as the other starts) |
+| 11:00 AM – 12:00 PM | Allowed (starts as the other ends) |
+| 9:30 – 10:30 AM | Clash |
+| 10:15 – 10:45 AM | Clash |
+| Same time, different room or day | Allowed |
 
 ## How to try the main search
 
-1. Sign in as `admin` / `admin123`
+1. Sign in with an Admin or Super Admin account
 2. Open **Find Classroom**
 3. Day: Wednesday
-4. Time: Period 5 (14:00 – 15:00)
+4. Time: Period 5 (2:00 PM – 3:00 PM)
 5. Students: 45
 
 Suitable free rooms include **204** (Main Building, 2nd Floor, capacity 60) and **305** (Science Building, 3rd Floor, capacity 50). Occupied rooms for that period are not listed.
@@ -119,7 +164,7 @@ CIAS/
   populate_dummy_data.py   Dummy campus data for testing
   seed.py                  Seed helpers
   run_desktop.py           Desktop window
-  templates/               HTML pages
+  templates/               HTML pages (including register.html and verify_email.html)
   static/css|js            Styles and UI
   project_desciption.txt   Original project brief
 ```

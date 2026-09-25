@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · CIAS{% endblock %}
 {% block heading %}Dashboard{% endblock %}
-{% block lede %}Overview of campus rooms, occupancy and who holds admin access.{% endblock %}
+{% block lede %}Overview of campus rooms, occupancy and bookings.{% endblock %}
 
 {% block content %}
 <section class="stat-grid">
@@ -40,9 +40,6 @@
       </div>
       <div class="toolbar" style="margin:0">
         <a class="btn" href="{{ url_for('search_page') }}">Find empty classroom</a>
-        {% if campus and campus.complete %}
-        <button type="button" class="btn primary" data-start-tour>Product tour</button>
-        {% endif %}
       </div>
     </header>
     {% if occupancy %}
@@ -67,28 +64,6 @@
     </p>
   </article>
 
-  <article class="panel">
-    <header class="panel-head">
-      <div>
-        <h2>Who is an admin?</h2>
-        <p>Accounts with Super Admin or Admin access.</p>
-      </div>
-    </header>
-    <ul class="people">
-      {% for person in admins %}
-        <li>
-          <div class="avatar sm">{{ person.full_name[:1] }}</div>
-          <div>
-            <strong>{{ person.full_name }}</strong>
-            <small>{{ person.department or 'Administration' }} · {{ person.username }}</small>
-          </div>
-          <span class="role-badge role-{{ person.role }}">{{ person.role_label }}</span>
-        </li>
-      {% else %}
-        <li class="muted">No admin accounts found.</li>
-      {% endfor %}
-    </ul>
-  </article>
 </div>
 
 <article class="panel">

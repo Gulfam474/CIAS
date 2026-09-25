@@ -77,7 +77,7 @@ def main():
             reset_campus()
         seed_run()
         verify_example()
-        print("\nSign in: admin / admin123")
+        print("\nCreate an account at the registration page.")
         print("Then open Find Classroom → Wednesday → Period 5 → 45 students.")
 
 
